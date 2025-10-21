@@ -1,83 +1,161 @@
+# AFM Demo — FastAPI · Docker · CI (RAG-ready)
 
-# AFM Demo – FastAPI + Docker + CI (RAG-ready scaffold)
+Minimal service scaffold for GenAI/RAG/agent experiments. Runs locally, in Docker, and on Cloud Run. CI runs lint + tests on every push.
 
-A minimal, production-ready scaffold to demo a small GenAI/RAG/agent service:
+## What’s inside
+- FastAPI app with `/healthz` and a stubbed `/answer`
+- Config via Pydantic (env-driven)
+- Tests with `pytest` (async client)
+- Ruff for linting
+- Dockerfile (small, Python 3.11 slim)
+- GitHub Actions workflow (lint + tests)
 
-- **FastAPI** app with health, versioned prompts, and a stub `/answer` endpoint.
-- **Tests** with `pytest`.
-- **CI** via GitHub Actions (lint + tests).
-- **Docker** for containerized deploys.
-- **Makefile** for common tasks.
-- **Config** with Pydantic settings.
+---
 
-## Local dev
+## Quick start (local)
 
 ```bash
-python -m venv .venv && source .venv/bin/activate  # on Windows: .venv\Scripts\activate
+# create venv
+python -m venv .venv
+# activate
+#  - Windows PowerShell:
+.\.venv\Scriptsctivate
+#  - macOS/Linux:
+# source .venv/bin/activate
+
+# install deps
 pip install -r requirements.txt
-make run                                            # http://localhost:8000/healthz
-make test
+
+# run dev server
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# open: http://localhost:8000/healthz and http://localhost:8000/docs
 ```
 
-## Docker build & run
-
+### Tests & lint
 ```bash
-docker build -t afm-demo:latest .
-docker run -p 8000:8000 --env-file .env afm-demo:latest
+pytest -q
+ruff check .
+ruff check --fix .   # auto-fix import order, etc.
 ```
 
-## Deploy (Render or Cloud Run)
-
-### Option A: Google Cloud Run
-1. `gcloud auth login` and `gcloud config set project <PROJECT_ID>`
-2. Build & push:
-   ```bash
-   gcloud builds submit --tag gcr.io/<PROJECT_ID>/afm-demo:latest
-   ```
-3. Deploy:
-   ```bash
-   gcloud run deploy afm-demo \
-     --image gcr.io/<PROJECT_ID>/afm-demo:latest \
-     --platform managed \
-     --region europe-west1 \
-     --allow-unauthenticated \
-     --set-env-vars APP_ENV=prod
-   ```
-
-### Option B: Render
-- Connect the repo, choose **Docker**.
-- Set environment var `APP_ENV=prod`.
-- Auto-deploy on push.
-
-## Endpoints
-
-- `GET /healthz` → liveness
-- `POST /answer` → stubbed RAG/agent answer with prompt version tagging
+---
 
 ## Configuration
 
-Environment variables (via `.env` or platform secrets):
+Create `.env` (copy from `.env.example`):
 
-- `APP_ENV` – `dev` or `prod` (default: `dev`)
-- `MODEL_NAME` – logical model name label (default: `mock-001`)
+```
+APP_ENV=dev
+MODEL_NAME=mock-001
+```
 
-## Extending to RAG
+These show up in `/answer` responses so you can verify which env/model is active.  
+Change `.env`, restart the app (or pass envs at container runtime).
 
-- Add a `/ingest` endpoint to index documents (FAISS/pgvector).
-- Implement chunking (200–500 tokens), embeddings, and retrieval (BM25/dense).
-- Add an evaluation script in `eval/` to score a tiny QA set.
+---
+
+## Docker
+
+```bash
+# build image
+docker build -t afm-demo:latest .
+
+# run with env file
+docker run -p 8000:8000 --env-file .env afm-demo:latest
+
+# open:
+#   http://localhost:8000/healthz
+#   http://localhost:8000/docs
+```
+
+`.dockerignore` excludes venv, caches, and `.env` so secrets don’t get baked into images.
+
+---
+
+## Deploy — Google Cloud Run (Milan / europe-west8)
+
+Prereqs: Google Cloud SDK installed, a GCP project with Billing, and required APIs enabled:
+```bash
+gcloud auth login
+gcloud config set project <PROJECT_ID>
+gcloud config set run/region europe-west8
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+```
+
+Build + push to **Artifact Registry** (creates the repo once):
+```bash
+gcloud artifacts repositories create afm-repo   --repository-format=docker   --location=europe-west8   --description="afm images" || true
+```
+
+Build and tag by commit (from the project folder with the Dockerfile):
+```bash
+# Windows PowerShell
+$commit = (git rev-parse --short HEAD)
+gcloud builds submit --tag europe-west8-docker.pkg.dev/<PROJECT_ID>/afm-repo/afm-demo:$commit
+```
+
+Deploy:
+```bash
+gcloud run deploy afm-demo `
+  --image europe-west8-docker.pkg.dev/<PROJECT_ID>/afm-repo/afm-demo:$commit `
+  --region europe-west8 `
+  --platform managed `
+  --allow-unauthenticated `
+  --port 8000 `
+  --set-env-vars APP_ENV=prod,MODEL_NAME=demo-xyz
+```
+
+Get URL:
+```bash
+gcloud run services describe afm-demo --region europe-west8 --format="value(status.url)"
+```
+
+### Logs
+```bash
+# one-shot
+gcloud run services logs read afm-demo --region europe-west8 --limit 50
+
+# live tail (needs beta component)
+gcloud beta run services logs tail afm-demo --region europe-west8
+```
+
+### Update env vars (no rebuild)
+```bash
+gcloud run services update afm-demo --region europe-west8 `
+  --update-env-vars APP_ENV=prod,MODEL_NAME=demo-xyz-2
+```
+
+### Reasonable runtime limits
+```bash
+gcloud run services update afm-demo --region europe-west8 --max-instances 3
+gcloud run services update afm-demo --region europe-west8 --cpu 1 --memory 512Mi --concurrency 80 --timeout 60
+```
+
+---
+
+## Endpoints
+
+- `GET /healthz` — liveness
+- `POST /answer` — stub answer with prompt/version + env/model echo  
+  Example:
+  ```json
+  { "question": "What is this service?" }
+  ```
+
+---
 
 ## Project layout
 
 ```
 .
 ├── app/
-│   ├── main.py
-│   ├── config.py
-│   └── service.py
+│   ├── main.py         # FastAPI routes
+│   ├── service.py      # business logic (stub now; drop RAG/agent here)
+│   └── config.py       # env-driven settings
 ├── tests/
-│   └── test_app.py
+│   └── test_app.py     # health + answer tests (async httpx client)
 ├── .github/workflows/ci.yml
+├── .dockerignore
 ├── .gitignore
 ├── Dockerfile
 ├── Makefile
@@ -85,3 +163,44 @@ Environment variables (via `.env` or platform secrets):
 ├── requirements.txt
 └── README.md
 ```
+
+---
+
+## CI
+
+Pushing to `main` triggers:
+- `ruff check` (import order, errors, upgrades)
+- `pytest` (async tests)
+
+Fixes are fast locally (`ruff check --fix .` / `pytest -q`) and the same checks run in Actions.
+
+---
+
+## RAG (optional next step)
+
+A tiny RAG layer can be added without a DB:
+- Add `sentence-transformers` + `numpy`.
+- Chunk text → embed → store vectors in a small pickle.
+- `/ingest` to add docs, `/answer_rag` to retrieve top-k with scores + context.
+
+For a more serious setup later:
+- Replace the in-memory store with **FAISS** or **pgvector**,
+- Add an LLM call that summarizes top-k contexts,
+- Wire minimal evals (10–20 Q/A) and log answer quality.
+
+---
+
+## Common gotchas (Windows)
+
+- If tests can’t import `app`, ensure `app/__init__.py` exists and `pyproject.toml` has:
+  ```toml
+  [tool.pytest.ini_options]
+  pythonpath = ["."]
+  asyncio_mode = "auto"
+  asyncio_default_fixture_loop_scope = "function"
+  ```
+- With Pydantic v2, use `pydantic-settings`:
+  ```python
+  from pydantic_settings import BaseSettings, SettingsConfigDict
+  ```
+- If Docker build fails on `requirements.txt`, make sure the file is saved as **UTF-8** (not UTF-16).
