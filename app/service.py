@@ -1,6 +1,7 @@
-
 from datetime import datetime
+
 from .config import settings
+
 
 def generate_answer(question: str) -> dict:
     # Placeholder for RAG/agent logic. Swap this with retriever + generator + guardrails.
