@@ -164,43 +164,5 @@ gcloud run services update afm-demo --region europe-west8 --cpu 1 --memory 512Mi
 └── README.md
 ```
 
----
 
-## CI
 
-Pushing to `main` triggers:
-- `ruff check` (import order, errors, upgrades)
-- `pytest` (async tests)
-
-Fixes are fast locally (`ruff check --fix .` / `pytest -q`) and the same checks run in Actions.
-
----
-
-## RAG (optional next step)
-
-A tiny RAG layer can be added without a DB:
-- Add `sentence-transformers` + `numpy`.
-- Chunk text → embed → store vectors in a small pickle.
-- `/ingest` to add docs, `/answer_rag` to retrieve top-k with scores + context.
-
-For a more serious setup later:
-- Replace the in-memory store with **FAISS** or **pgvector**,
-- Add an LLM call that summarizes top-k contexts,
-- Wire minimal evals (10–20 Q/A) and log answer quality.
-
----
-
-## Common gotchas (Windows)
-
-- If tests can’t import `app`, ensure `app/__init__.py` exists and `pyproject.toml` has:
-  ```toml
-  [tool.pytest.ini_options]
-  pythonpath = ["."]
-  asyncio_mode = "auto"
-  asyncio_default_fixture_loop_scope = "function"
-  ```
-- With Pydantic v2, use `pydantic-settings`:
-  ```python
-  from pydantic_settings import BaseSettings, SettingsConfigDict
-  ```
-- If Docker build fails on `requirements.txt`, make sure the file is saved as **UTF-8** (not UTF-16).
