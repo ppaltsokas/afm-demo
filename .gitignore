@@ -1,23 +1,21 @@
-
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.env
+# Python / venv
 .venv/
-.env.*
-.pytest_cache/
-.cache/
-.coverage
-dist/
-build/
+__pycache__/
+*.pyc
 
-# Editors
-.vscode/
+# Local data & models
+data/
+*.npy
+*.npz
+*.pkl
+
+# IDE
 .idea/
+.vscode/
 
 # OS
 .DS_Store
+Thumbs.db
 
-# Local data
-data/
+# Env
+.env
