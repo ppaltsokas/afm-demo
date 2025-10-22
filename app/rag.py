@@ -1,14 +1,15 @@
 from __future__ import annotations
-from typing import List, Dict, Optional, Tuple
-from pathlib import Path
+
 import json
+from pathlib import Path
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
 # ---------- Globals (in-memory index) ----------
-_model: Optional[SentenceTransformer] = None
-_corpus: List[Dict[str, str]] = []          # [{id:str, text:str, meta?:dict}]
-_matrix: Optional[np.ndarray] = None         # (N, D) normalized embeddings
+_model: SentenceTransformer | None = None
+_corpus: list[dict[str, str]] = []          # [{id:str, text:str, meta?:dict}]
+_matrix: np.ndarray | None = None         # (N, D) normalized embeddings
 
 # ---------- Storage paths ----------
 DATA_DIR = Path("data")
@@ -31,7 +32,7 @@ def _ensure_data_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------- Core API ----------
-def ingest(documents: List[Dict[str, str]]) -> int:
+def ingest(documents: list[dict[str, str]]) -> int:
     """
     documents: list of dicts with {"id": str, "text": str, ...}
     Returns number ingested.
@@ -47,7 +48,7 @@ def ingest(documents: List[Dict[str, str]]) -> int:
     _matrix = emb if _matrix is None else np.vstack([_matrix, emb])
     return len(documents)
 
-def retrieve(query: str, top_k: int = 3) -> List[Tuple[float, Dict[str, str]]]:
+def retrieve(query: str, top_k: int = 3) -> list[tuple[float, dict[str, str]]]:
     global _corpus, _matrix
     if not _corpus or _matrix is None:
         return []
@@ -60,7 +61,7 @@ def retrieve(query: str, top_k: int = 3) -> List[Tuple[float, Dict[str, str]]]:
     return [(float(scores[i]), _corpus[i]) for i in idx]
 
 # ---------- Persistence ----------
-def save_index() -> Dict[str, str]:
+def save_index() -> dict[str, str]:
     """Save corpus and embeddings to disk."""
     global _corpus, _matrix
     _ensure_data_dir()
@@ -80,14 +81,14 @@ def save_index() -> Dict[str, str]:
 
     return {"saved": "ok", "path": str(DATA_DIR)}
 
-def load_index() -> Dict[str, str]:
+def load_index() -> dict[str, str]:
     """Load corpus and embeddings from disk, if present."""
     global _corpus, _matrix
     if not CORPUS_PATH.exists() or not EMB_PATH.exists():
         return {"loaded": "empty"}
 
     # Load corpus
-    corpus: List[Dict[str, str]] = []
+    corpus: list[dict[str, str]] = []
     with CORPUS_PATH.open("r", encoding="utf-8") as f:
         for line in f:
             if line.strip():
@@ -103,7 +104,7 @@ def load_index() -> Dict[str, str]:
     _matrix = emb
     return {"loaded": "ok", "count": str(len(_corpus))}
 
-def reset_index() -> Dict[str, str]:
+def reset_index() -> dict[str, str]:
     """Clear memory and remove on-disk files."""
     global _corpus, _matrix
     _corpus = []

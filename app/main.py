@@ -1,13 +1,15 @@
 # app/main.py
 from __future__ import annotations
-from typing import List, Dict, Any
+
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
-from .service import generate_answer, ingest_docs, save_index, load_index, reset_index
+from .service import generate_answer, ingest_docs, load_index, reset_index, save_index
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,10 +47,10 @@ def answer(body: Ask):
 class Doc(BaseModel):
     id: str
     text: str
-    meta: Dict[str, Any] | None = None
+    meta: dict[str, Any] | None = None
 
 @app.post("/ingest")
-def ingest(body: List[Doc]):
+def ingest(body: list[Doc]):
     return ingest_docs([d.model_dump() for d in body])
 
 

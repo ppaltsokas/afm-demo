@@ -1,13 +1,16 @@
 from __future__ import annotations
-from typing import Dict, Any, List
-from .config import settings
-from . import rag
+
 import re
-from typing import Optional
+from typing import Any
+
 import requests
 from bs4 import BeautifulSoup
 
-def generate_answer(question: str) -> Dict[str, Any]:
+from . import rag
+from .config import settings
+
+
+def generate_answer(question: str) -> dict[str, Any]:
     try:
         hits = rag.retrieve(question, top_k=1)
         if hits:
@@ -34,20 +37,20 @@ def generate_answer(question: str) -> Dict[str, Any]:
             "env": settings.app_env,
         }
 
-def ingest_docs(items: List[Dict[str, str]]) -> Dict[str, Any]:
+def ingest_docs(items: list[dict[str, str]]) -> dict[str, Any]:
     try:
         n = rag.ingest(items)
         return {"ingested": n, "total_hint": "In-memory only unless /save is called."}
     except Exception as e:
         return {"ingested": 0, "error": f"{type(e).__name__}: {e}"}
 
-def save_index() -> Dict[str, Any]:
+def save_index() -> dict[str, Any]:
     return rag.save_index()
 
-def load_index() -> Dict[str, Any]:
+def load_index() -> dict[str, Any]:
     return rag.load_index()
 
-def reset_index() -> Dict[str, Any]:
+def reset_index() -> dict[str, Any]:
     return rag.reset_index()
 
 def _clean_text(s: str) -> str:
@@ -73,7 +76,7 @@ def _chunk(text: str, chunk_size: int = 400, overlap: int = 40) -> list[dict]:
             start = 0
     return chunks
 
-def ingest_from_url(url: str, id_prefix: Optional[str] = None) -> dict:
+def ingest_from_url(url: str, id_prefix: str | None = None) -> dict:
     """Fetch a page, extract visible text, chunk, and ingest."""
     resp = requests.get(url, timeout=20)
     resp.raise_for_status()
